@@ -1,0 +1,12 @@
+{
+  "name": "cyber-financial-home-loan-harvester",
+  "version": "1.0.0",
+  "description": "Nightly server-side harvest of Australian home-loan Product Reference Data from the CDR Open Banking APIs.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "harvest": "node harvest.js",
+    "harvest:test": "LIMIT=5 node harvest.js"
+  },
+  "license": "MIT"
+}
