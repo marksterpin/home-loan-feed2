@@ -126,7 +126,8 @@ async function harvestLender(lender){
   } catch (e) {
     result.status = "fail"; result.error = e.message; return result;
   }
-  const mortgages = products.filter(p => p.productCategory === "RESIDENTIAL_MORTGAGES");
+  const COVERED = ["RESIDENTIAL_MORTGAGES", "PERS_LOANS", "BUY_NOW_PAY_LATER", "BUSINESS_LOANS", "OVERDRAFTS", "LEASES", "TRADE_FINANCE"];
+  const mortgages = products.filter(p => COVERED.includes(p.productCategory));
   // fetch detail with bounded concurrency
   let i = 0;
   async function worker(){
@@ -141,6 +142,9 @@ async function harvestLender(lender){
           lender: lender.name,
           name: p.name || "",
           description: (p.description || "").slice(0, 300),
+          category: p.productCategory || "",
+          isTailored: !!(d.isTailored || p.isTailored),
+          constraints: (d.constraints || []).map(c => ({ type: c.constraintType || "", value: c.additionalValue != null ? String(c.additionalValue) : null, info: (c.additionalInfo || "").slice(0,120) })).slice(0, 8),
           lastUpdated: (d.lastUpdated || p.lastUpdated || "").slice(0, 10),
           applicationUri: d.applicationUri || (d.additionalInformation && (d.additionalInformation.overviewUri || "")) || "",
           basic: /\b(basic|no.?frills|essential|simplicity|simple|economy|budget|value)\b/.test(lc(p.name + " " + (p.description||""))),
@@ -217,7 +221,10 @@ async function main(){
   // also a tiny meta file for quick status checks
   await writeFile(`${OUT_DIR}/meta.json`, JSON.stringify({
     generatedAt: out.generatedAt, lenderCount: out.lenderCount, productCount: out.productCount,
-    lenders: out.lenders.map(l => ({ name: l.name, status: l.status, productCount: l.productCount }))
+    byCategory: allProducts.reduce((a,p)=>{ a[p.category]=(a[p.category]||0)+1; return a; }, {}),
+    mortgageCount: allProducts.filter(p => p.category === "RESIDENTIAL_MORTGAGES").length,
+    tailoredCount: allProducts.filter(p => p.isTailored).length,
+    lenders: out.lenders.map(l => ({ name: l.name, status: l.status, error: l.error, productCount: l.productCount }))
   }, null, 2));
 
   const ok = lenderMeta.filter(l => l.status === "ok").length;
