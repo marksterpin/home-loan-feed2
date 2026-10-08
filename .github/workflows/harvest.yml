@@ -1,0 +1,55 @@
+name: Harvest CDR home-loan data
+
+# Runs nightly and publishes public/products.json to GitHub Pages.
+on:
+  schedule:
+    - cron: "0 17 * * *"   # 17:00 UTC ~ 03:00/04:00 AEST/AEDT
+  workflow_dispatch:        # manual "Run workflow" button
+    inputs:
+      force:
+        description: "Publish even if this run is much smaller than the last feed"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      # Action versions below all run on Node 24. The previous v4 set ran on Node 20,
+      # which GitHub is removing from Actions runners.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      # If a run collapses (register unreachable, most lenders failing) the harvester exits
+      # with an error and writes nothing. This job then fails, the deploy job is skipped,
+      # and GitHub Pages keeps serving the last good feed.
+      - name: Run harvester
+        run: node harvest.js
+        env:
+          OUT: public
+          FORCE: ${{ inputs.force }}
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: public
+
+  deploy:
+    needs: harvest
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
